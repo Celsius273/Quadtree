@@ -1,0 +1,21 @@
+#mainTitle{
+	font-family: Helvetica;
+	font-size: 36px;
+	color: #333333;
+	text-align: center;
+	text-shadow: 1px 2px 3px #ccc; 
+	border-bottom:1px solid #cbcbcb;
+	padding-bottom: 15px;
+	margin: 20px;
+}
+
+#body { 
+	background-color:#ededed; 
+	font:normal 12px/18px Arial, Helvetica, sans-serif; 
+}
+
+#Main{
+	width: 640px;
+	border: 1px solid #cbcbcb;
+	margin:0 auto;
+}
