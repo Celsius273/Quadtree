@@ -10,12 +10,27 @@
 }
 
 #body { 
-	background-color:#ededed; 
 	font:normal 12px/18px Arial, Helvetica, sans-serif; 
 }
 
 #Main{
-	width: 640px;
+	width: 660px;
+	height: 760px;
 	border: 1px solid #cbcbcb;
 	margin:0 auto;
+	background-color:#ededed; 
+}
+
+#QuadTree{
+	width: 640px;
+	height: 640px;
+	margin:0 auto;
+	background-color:#333333; 
+	position: relative;
+}
+
+#mainCanvas{
+	background:#333333; 
+	border:2px solid #222222; 
+	position: relative;
 }
