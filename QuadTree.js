@@ -12,7 +12,17 @@ Basically: if 2 objects are in different quadtree nodes, we know that they won't
 The only weakness of this data structure is the fact that if 2 objects are in different quadtrees but their areas overlap, the algorithm fails unless we explicitly check for geometric properties when we insert into a quadtree
 
 */
-function getRandomColor(start, end) {
+
+var CIRCLE_SIZE = 4;
+var CIRCLE_COUNT = 0;
+var MAX_LEVEL = 9; //The maximum number of time we can, say, split our quadtree
+var MAX_OBJECTS = 6; //The maximum number of objects within a quadtree
+var CANVAS_SIZE = 640;
+
+var HIT_COLOR = "#f00"; 
+var TREE_COLOR = "#fa0";
+
+function getRandomColor(start, end) { // function that returns a hex string for a random color, randomized color values are configurable to an extent
     var letters = '0123456789ABCDEF'.split('');
     var color = '#';
     for (var i = 0; i < 6; i++ ) {
@@ -21,7 +31,7 @@ function getRandomColor(start, end) {
     return color;
 }
 
-function Circle(x, y, radius, id)
+function Circle(x, y, radius, id) //A basic circle struct
 {
 	this.x=x;
 	this.y=y;
@@ -29,9 +39,6 @@ function Circle(x, y, radius, id)
 
 	this.xv = Math.floor(Math.random() * 8) - 4;
 	this.yv = Math.floor(Math.random() * 8) - 4;
-
-	//this.xv = 0
-	//this.yv = 0
 
 	this.color = getRandomColor(12, 16);
 	this.intersect = false;
@@ -43,14 +50,11 @@ function distance(x1, y1, x2, y2)
 {
 	var a = Math.pow((y2-y1), 2);
 	var b = Math.pow((x2-x1), 2);
-
-	var c = Math.pow((a+b), 0.5);
-	return c;
+	return Math.pow((a+b), 0.5);
 }
 
-var maxLevel = 6; //The maximum number of time we can, say, split our quadtree
-var maxObjects = 4; //The maximum number of objects within a quadtree
-function QuadTree(x, y, length, level) //Assume square quadtree and square canvases
+
+function QuadTree(x, y, length, level) //Assume square quadtree and square canvases for this simulator
 {
 	this.x=x;
 	this.y=y;
@@ -77,31 +81,34 @@ QuadTree.prototype.clear = function(){
 }
 
 QuadTree.prototype.split = function(){
-	var halfLength = Math.round((this.length + 0.0)/2);
+	var halfLength = Math.round((this.length)/2.0);
 
 	this.nodes[0] = new QuadTree(this.x, this.y, halfLength, this.level+1);
 	this.nodes[1] = new QuadTree(this.x+halfLength, this.y, halfLength, this.level+1);
 	this.nodes[2] = new QuadTree(this.x, this.y+halfLength, halfLength, this.level+1);
 	this.nodes[3] = new QuadTree(this.x+halfLength, this.y+halfLength, halfLength, this.level+1);
-
 }
 
 QuadTree.prototype.getIndex = function(circle){ //so far, only works if the circle's CENTER is fully in a node, radius calculations are not considered at this point
 	var index = -1;
-	var halfLength = Math.round((this.length + 0.0)/2);
-	var leftHalf = (circle.x >= this.x && circle.x <= (this.x + halfLength));
-	var topHalf  = (circle.y >= this.y && circle.y <= (this.y + halfLength));
+	var halfLength = Math.round((this.length)/2.0);
+	
+	var leftHalf =   (circle.x >= this.x && circle.x <= (this.x + halfLength));
+	var rightHalf =  (circle.x > (this.x + halfLength) && circle.x <= (this.x + this.length));
+
+	var topHalf  =   (circle.y >= this.y && circle.y <= (this.y + halfLength));
+	var bottomHalf = (circle.y > (this.y + halfLength) && circle.y <= (this.y + this.length));
 
 	if (topHalf == true){
 		if (leftHalf == true){
 			index = 0;
-		}else{
+		}else if (rightHalf == true){
 			index = 1;
 		}
-	}else{
+	}else if (bottomHalf == true){
 		if (leftHalf == true){
 			index = 2;
-		}else{
+		}else if (rightHalf == true){
 			index = 3;
 		}
 	}
@@ -109,12 +116,10 @@ QuadTree.prototype.getIndex = function(circle){ //so far, only works if the circ
 }
 
 QuadTree.prototype.insert = function(circle){
-	if (this.nodes[0] != null)
-	{
+	if (this.nodes[0] != null){
 		var index = this.getIndex(circle);
 
-		if (index != -1)
-		{
+		if (index != -1){
 			this.nodes[index].insert(circle);
 			return;
 		}
@@ -122,20 +127,18 @@ QuadTree.prototype.insert = function(circle){
 
 	this.objects[this.objects.length] = circle;
 
-	if (this.objects.length > maxObjects && this.level < maxLevel)
+	if (this.objects.length > MAX_OBJECTS && this.level < MAX_LEVEL)
 	{
-		if (this.nodes[0] == null)
-		{
+		if (this.nodes[0] == null){
 			this.split();
 		}
 		var i=0;
 		while (i<this.objects.length)
 		{
 			var midIndex = this.getIndex (this.objects[i]);
-			if (midIndex != -1)
-			{
+			if (midIndex != -1){
 				this.nodes[midIndex].insert(this.objects[i]);
-				this.objects.splice(i, 1);
+				this.objects.splice(i, 1); //remove the current item from this quadtree's object list if it is to be inserted into a subtree
 			}
 			else{
 				i++;
@@ -144,27 +147,26 @@ QuadTree.prototype.insert = function(circle){
 	}
 }
 
-
+// retrieves the objects that are determined to be likely to collide with a given circle aka all circles within the current node of the circle
 QuadTree.prototype.retrieve = function(returnObjects, circle) {
 	var index = this.getIndex(circle);
 	if (index != -1 && this.nodes[0] != null) {
-   		this.nodes[index].retrieve(returnObjects, circle);
+   		return this.nodes[index].retrieve(returnObjects, circle);
 	}
  
- 	for (var i=0;i<this.objects.length; i++)
- 	{
+ 	for (var i=0;i<this.objects.length; i++) {
 		returnObjects[returnObjects.length] = this.objects[i];
  	}
 	return returnObjects;
 }
 
+// rendering method for the quadtree object itself
 QuadTree.prototype.drawTree = function(context){
 	var midLength = Math.round(this.length/2);
 	var qLength = Math.round(midLength/2);
 	
-
 	context.beginPath();
-	context.strokeStyle = "#FFAA00";
+	context.strokeStyle = TREE_COLOR;
 	context.rect(this.x, this.y, this.length, this.length);	
 	context.stroke();
 	context.closePath();	
@@ -175,37 +177,30 @@ QuadTree.prototype.drawTree = function(context){
 		}
 	}
 }
-var circles = [];
-var mx = 0;
-var my = 0;
-var lol;
 
-var quad = new QuadTree(0, 0, 640, 1);
+var circles = []; //list of all circles currently on the screen
+var quad = new QuadTree(0, 0, CANVAS_SIZE, 1); //singleton instance of QuadTree to be used in this simulator
 
 function action()
 {
 	quad.clear(); //clear EVERYTHING
-	for (var i=0; i<circles.length; i++)
-	{
+	for (var i=0; i<circles.length; i++) {
 		quad.insert(circles[i]);
 	}
 
 	var relevant=[];
 
-	for (var i=0; i<circles.length; i++)
-	{
-		relevant=[];
+	for (var i=0; i<circles.length; i++) {
+		relevant = [];
 		quad.retrieve(relevant, circles[i]);
 		circles[i].intersect = false;
-		for (var j=0; j<relevant.length; j++)
-		{
-			if ( (circles[i].id != relevant[j].id) && (distance(circles[i].x, circles[i].y, relevant[j].x, relevant[j].y) <= (circles[i].radius+relevant[j].radius)) )
-			{
+		for (var j=0; j<relevant.length; j++) {
+
+			// check collisions between all circles, making sure that they do not have the same ID (to prevent self-intersection) and the distance between their centers are less than the sum of their radii
+			if ( (circles[i].id != relevant[j].id) && (distance(circles[i].x, circles[i].y, relevant[j].x, relevant[j].y) <= (circles[i].radius+relevant[j].radius)) ) {
 				circles[i].intersect = true;
 			}
 		}
-
-		relevant = [];
 	}
 }
 
@@ -216,21 +211,36 @@ function move()
 		circles[i].x+=circles[i].xv;
 		circles[i].y+=circles[i].yv;
 
-		if (circles[i].x > (640-circles[i].radius) || circles[i].x < circles[i].radius)
-		{
+		if (circles[i].x > (CANVAS_SIZE-circles[i].radius) || circles[i].x < circles[i].radius){
 			circles[i].xv = -circles[i].xv;
 		}
-		if (circles[i].y > (640-circles[i].radius) || circles[i].y < circles[i].radius)
-		{
+		if (circles[i].y > (CANVAS_SIZE-circles[i].radius) || circles[i].y < circles[i].radius){
 			circles[i].yv = -circles[i].yv;
 		}
 	}
 }
 
+var fps = {
+	startTime : 0,
+	frameNumber : 0,
+	getFPS : function(){
+		this.frameNumber++;
+		var d = new Date().getTime(),
+			currentTime = ( d - this.startTime ) / 1000,
+			result = Math.floor( ( this.frameNumber / currentTime ) );
+
+		if( currentTime > 1 ){
+			this.startTime = new Date().getTime();
+			this.frameNumber = 0;
+		}
+		return result;
+	}	
+};
+
 function draw()
 {
 	var context = document.getElementById('mainCanvas').getContext('2d');
-	context.clearRect(0,0,640,640);
+	context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 	action();
 	move();
 
@@ -244,31 +254,38 @@ function draw()
 		{
 			context.fillStyle = circles[i].color;
 		}else{
-			context.fillStyle = "#FF0000"; //red
+			context.fillStyle = HIT_COLOR;
 		}
 		context.arc(circles[i].x, circles[i].y, circles[i].radius, 0, 2 * Math.PI, false);
 		context.fill();
 		context.closePath();
 
 	}
-}
 
-var count = 0;
+	$(".counter").html(fps.getFPS());
+}
 
 $(document).ready(function() {
 	$(document.getElementById('mainCanvas')).click(function(e){
-		circles[circles.length] = new Circle(mx, my, 6, count);
-
-		count++;
-		quad.insert(circles[circles.length-1]);
-		console.log(mx+" "+my);
-	});
-
-	$(document.getElementById('mainCanvas')).mousemove(function(e) {
 		var element = document.getElementById('QuadTree');
 
-		mx = e.clientX - element.offsetLeft;
-		my = e.clientY - element.offsetTop;
+		var circlesToAdd = 1;
+		switch (e.which) {
+        	case 2:
+        		circlesToAdd = 100; // to quickly populate the canvas
+				break;
+			default:
+
+    	}	
+
+		for (var i=0; i < circlesToAdd; i++){
+			circles[circles.length] = new Circle(e.clientX - element.offsetLeft, e.clientY - element.offsetTop, CIRCLE_SIZE, CIRCLE_COUNT);
+			CIRCLE_COUNT++;
+			$(".numCircles").html(CIRCLE_COUNT);
+			quad.insert(circles[circles.length-1]);
+		}
+		
 	});
 });
 setInterval(draw, 15);
+
